@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mizo Editor Pro</title>
+    <style>
+        body { font-family: Arial; background: #111; color: white; padding: 10px; margin: 0; }
+    .box { max-width: 500px; margin: auto; }
+        h1 { text-align: center; color: #0f8; margin: 10px 0; }
+        video { width: 100%; border-radius: 10px; margin: 10px 0; background: #000; }
+        input, button, textarea, select {
+            width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px;
+            border: none; font-size: 15px; box-sizing: border-box;
+        }
+        button { background: #0a5; color: white; font-weight: bold; }
+        button:disabled { background: #444; }
+    .row { display: flex; gap: 6px; }
+    .row input,.row select { flex: 1; }
+       .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        #canvas { display: none; }
+        #status { padding: 10px; text-align: center; background: #222; border-radius: 8px; margin: 5px 0; }
+        label { font-size: 13px; color: #aaa; margin-top: 8px; display: block; }
+        h3 { color: #0f8; margin: 15px 0 5px 0; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>⚡ MIZO EDITOR PRO</h1>
+
+        <input type="file" id="file" accept="video/*">
+        <video id="vid" controls></video>
+        <canvas id="canvas"></canvas>
+
+        <h3>1. CUT CHHUNG</h3>
+        <div class="row">
+            <input type="number" id="start" placeholder="Start" value="0" step="0.1">
+            <input type="number" id="end" placeholder="End" value="5" step="0.1">
+        </div>
+
+        <h3>2. TEXT DAH</h3>
+        <textarea id="text" placeholder="Text dah duh" rows="2"></textarea>
+        <div class="row">
+            <select id="textColor">
+                <option value="white">Var</option>
+                <option value="yellow">Eng</option>
+                <option value="#0f8">Hring</option>
+                <option value="red">Sen</option>
+            </select>
+            <select id="textSize">
+                <option value="40">Te</option>
+                <option value="60" selected>Lai</option>
+                <option value="80">Lian</option>
+            </select>
+            <select id="textPos">
+                <option value="bottom">Hnuai</option>
+                <option value="top">Chung</option>
+                <option value="center">Lai</option>
+            </select>
+        </div>
+
+        <h3>3. FILTER & SPEED</h3>
+        <label>Brightness: <span id="brightVal">100</span>%</label>
+        <input type="range" id="brightness" min="50" max="150" value="100">
+
+        <label>Contrast: <span id="contrastVal">100</span>%</label>
+        <input type="range" id="contrast" min="50" max="150" value="100">
+
+        <div class="row">
+            <select id="speed">
+                <option value="0.5">0.5x Muang</option>
+                <option value="1" selected>1x Pangngai</option>
+                <option value="1.5">1.5x Chak</option>
+                <option value="2">2x Chak</option>
+            </select>
+            <select id="filter">
+                <option value="none">Filter Tel Lo</option>
+                <option value="grayscale(100%)">Dum & Var</option>
+                <option value="sepia(100%)">Hlui</option>
+                <option value="saturate(200%)">Rawng Tak</option>
+            </select>
+        </div>
+
+        <h3>4. MUSIC DAH</h3>
+        <input type="file" id="musicFile" accept="audio/*">
+
+        <div class="grid" style="margin-top: 15px;">
+            <button onclick="processVideo()" id="btnProcess">✅ EDIT + DOWNLOAD</button>
+            <button onclick="resetAll()">🔄 RESET</button>
+        </div>
+
+        <div id="status">Video thlang phawt rawh</div>
+    </div>
+
+    <script>
+        let vid = document.getElementById('vid');
+        let file = document.getElementById('file');
+        let musicFile = document.getElementById('musicFile');
+        let status = document.getElementById('status');
+        let canvas = document.getElementById('canvas');
+        let ctx = canvas.getContext('2d');
+        let musicAudio = null;
+
+        // Sliders update
+        document.getElementById('brightness').oninput = e => document.getElementById('brightVal').textContent = e.target.value;
+        document.getElementById('contrast').oninput = e => document.getElementById('contrastVal').textContent = e.target.value;
+
+        file.onchange = e => {
+            let f = e.target.files[0];
+            if (!f) return;
+            vid.src = URL.createObjectURL(f);
+            vid.onloadedmetadata = () => {
+                document.getElementById('end').value = vid.duration.toFixed(1);
+                status.textContent = `Loaded: ${vid.duration.toFixed(1)}s`;
+            }
+        };
+
+        musicFile.onchange = e => {
+            let f = e.target.files[0];
+            if (!f) return;
+            musicAudio = new Audio(URL.createObjectURL(f));
+            status.textContent = 'Music loaded ✓';
+        };
+
+        function resetAll() {
+            document.getElementById('start').value = 0;
+            document.getElementById('end').value = vid.duration? vid.duration.toFixed(1) : 5;
+            document.getElementById('text').value = '';
+            document.getElementById('brightness').value = 100;
+            document.getElementById('contrast').value = 100;
+            document.getElementById('speed').value = 1;
+            document.getElementById('filter').value = 'none';
+            document.getElementById('brightVal').textContent = 100;
+            document.getElementById('contrastVal').textContent = 100;
+            musicAudio = null;
+            musicFile.value = '';
+        }
+
+        async function processVideo() {
+            if (!vid.src) return alert('Video thlang phawt rawh');
+
+            let startTime = parseFloat(document.getElementById('start').value);
+            let endTime = parseFloat(document.getElementById('end').value);
+            let txt = document.getElementById('text').value;
+            let textColor = document.getElementById('textColor').value;
+            let textSize = parseInt(document.getElementById('textSize').value);
+            let textPos = document.getElementById('textPos').value;
+            let brightness = document.getElementById('brightness').value;
+            let contrast = document.getElementById('contrast').value;
+            let speed = parseFloat(document.getElementById('speed').value);
+            let filter = document.getElementById('filter').value;
+
+            if (startTime >= endTime) return alert('End aia Start a tam tur a ni lo');
+
+            status.textContent = 'Edit mek... Lo nghak rawh';
+            document.getElementById('btnProcess').disabled = true;
+
+            canvas.width = vid.videoWidth;
+            canvas.height = vid.videoHeight;
+
+            let stream = canvas.captureStream(30);
+
+            // Audio mix
+            let audioCtx = new AudioContext();
+            let dest = audioCtx.createMediaStreamDestination();
+
+            // Video audio
+            let videoSource = audioCtx.createMediaElementSource(vid);
+            videoSource.connect(dest);
+            videoSource.connect(audioCtx.destination);
+
+            // Music audio
+            if (musicAudio) {
+                let musicSource = audioCtx.createMediaElementSource(musicAudio);
+                musicSource.connect(dest);
+                musicAudio.currentTime = 0;
+                musicAudio.play();
+            }
+
+            stream.addTrack(dest.stream.getAudioTracks()[0]);
+
+            let mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9,opus' });
+            let chunks = [];
+
+            mediaRecorder.ondataavailable = e => chunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                let blob = new Blob(chunks, { type: 'video/webm' });
+                let url = URL.createObjectURL(blob);
+                let a = document.createElement('a');
+                a.href = url;
+                a.download = 'mizo_pro_edited.webm';
+                a.click();
+                status.textContent = 'DONE! Download complete ✅';
+                document.getElementById('btnProcess').disabled = false;
+                if (musicAudio) musicAudio.pause();
+            };
+
+            vid.currentTime = startTime;
+            vid.playbackRate = speed;
+            await vid.play();
+            mediaRecorder.start();
+
+            function draw() {
+                if (vid.currentTime >= endTime) {
+                    mediaRecorder.stop();
+                    vid.pause();
+                    vid.playbackRate = 1;
+                    return;
+                }
+
+                // Filter apply
+                ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) ${filter}`;
+                ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+                ctx.filter = 'none';
+
+                // Text draw
+                if (txt) {
+                    ctx.font = `bold ${textSize}px Arial`;
+                    ctx.fillStyle = textColor;
+                    ctx.strokeStyle = 'black';
+                    ctx.lineWidth = 4;
+                    ctx.textAlign = 'center';
+
+                    let yPos = canvas.height - 80;
+                    if (textPos === 'top') yPos = 100;
+                    if (textPos === 'center') yPos = canvas.height / 2;
+
+                    ctx.strokeText(txt, canvas.width/2, yPos);
+                    ctx.fillText(txt, canvas.width/2, yPos);
+                }
+
+                requestAnimationFrame(draw);
+            }
+            draw();
+        }
+    </script>
+</body>
+          </html>
